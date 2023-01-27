@@ -150,3 +150,47 @@ resultTable$cogdx=factor(as.character(resultTable$cogdx),levels=c(1,2,4,5))
 pdf("MacUpGeneCogdxPattern.pdf",height=5,width=6)
 degPlotCluster(resultTable,time="cogdx",color="cogdx",boxes = TRUE,min_genes =  1)+geom_line(aes_string(group="genes"),alpha=0.5)+scale_color_brewer(palette="Set2")+theme_bw()
 dev.off()
+
+
+#####Exploring the M1 and M2 in brain marcophage ########################
+Mac=subset(BrainCellCom,CellType%in%c("Mac"))
+Mac <- NormalizeData(Mac, normalization.method = "LogNormalize", scale.factor = 10000)
+Mac <- FindVariableFeatures(Mac, selection.method = "vst", nfeatures = 2000)
+Mac <- ScaleData(Mac, verbose = FALSE)
+Mac <- RunPCA(Mac, features = VariableFeatures(object = Mac))
+Mac<- RunTSNE(Mac, reduction = "pca", dims = 1:30)
+Mac<- FindNeighbors(Mac, reduction = "pca", dims = 1:30)
+Mac<- FindClusters(Mac, resolution = 1)
+M1M2=read.table("M1M2Signature.txt",skip=1,sep="\t")
+colnames(M1M2)=c("Symbol","Group")
+M1M2List=split(M1M2$Symbol,M1M2$Group)
+Mac <- AddModuleScore(
+  object = Mac,
+  features = M1M2List,
+  name = names(M1M2List),
+  ctrl = 100
+)
+pdf("Mac/M1M2.pdf",height=4)
+VlnPlot(Mac, pt.size=0.5,features = c("M1.like.genes1","M2.like.genes2"))&NoLegend()&theme(panel.border = element_rect(fill=NA,color="black", size=1.5, linetype="solid"))
+dev.off()
+
+new.cluster.ids <- c("Macro-M2-like","Macro-M1-like","Macro-Others")
+names(new.cluster.ids) <- levels(Mac)
+Mac <- RenameIdents(Mac, new.cluster.ids)
+Mac$cellType=factor(Idents(Mac),levels=c("Macro-M1-like","Macro-M2-like","Macro-Others"))
+pdf("Mac/M1M2ModuleScore.pdf",height=4)
+VlnPlot(Mac, pt.size=0.5,features = c("M1.like.genes1","M2.like.genes2"),group.by="cellType")
+dev.off()
+
+BrainMac=subset(Mac,CellType%in%c("Macro-M1-like","Macro-M2-like"))
+tmp=data.frame(table(BrainMac$CellType,BrainMac$Statues))
+colnames(tmp)=c("cellType","Statues","cellNumber")
+g=ggplot(tmp, aes(Statues, cellNumber, fill=cellType)) +
+  geom_bar(stat="identity",position="fill") +
+  scale_y_continuous(expand=c(0,0))+theme_bw()+
+  scale_fill_manual(values=c("Violet","CornflowerBlue"))+
+  guides(fill = guide_legend(title = "Pattern", title.position = "top"),col = guide_legend(nrow = 1))+
+  theme(axis.title.x = element_blank(),axis.title.y = element_blank())
+pdf("Mac/M1M2DisInAD.pdf",width=5)
+print(g)
+dev.off()
