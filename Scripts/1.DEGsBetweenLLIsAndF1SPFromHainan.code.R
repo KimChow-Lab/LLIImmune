@@ -66,7 +66,7 @@ t=ggplot(data = hs_data, aes(x = log2FoldChange, y = -log10(pvalue), size=log2(b
   geom_point(alpha=0.4) +
   theme_bw() + scale_size(range = c(0, 4))+
   scale_color_manual(values=c("blue","RoyalBlue", "grey","Salmon","red")) +
-  #xlim(c(-5, 5)) + ylim(0,12.5)+
+  xlim(c(-4, 4)) + ylim(0,25)+
   geom_vline(xintercept=c(-log2(1.2),log2(1.2)),lty=4,col="black",lwd=0.8) +
   geom_hline(yintercept = -log10(0.05),lty=4,col="black",lwd=0.8) +
   labs(x="log2(fold change)",y="-log10 (p-value)",title="Differential Expressed Gene") +
@@ -215,3 +215,43 @@ theme(axis.title.y = element_text(size=rel(1.0)),axis.text.x = element_text(size
 pdf("SpecificGene/MSR1.pdf",height=3,width=4)
 print(t)
 dev.off()
+
+
+
+######## integrated analysis in the revised version ########
+
+setwd("D:/Aging/PBMC/HaiNan/Qingpeng")
+LS=read.csv("rawData/SciAdv/LS.readcounts.csv",header=T,row.names=1)
+LSSampleInfo=read.csv("rawData/SciAdv/LS.SAMPLE.infor.csv",header=T,row.names=1)
+all(colnames(LS)==rownames(LSSampleInfo))
+LG=read.csv("rawData/SciAdv/LG.readcounts.csv",header=T,row.names=1)
+LGSampleInfo=read.csv("rawData/SciAdv/LG.SAMPLE.infor.csv",header=T,row.names=1)
+all(colnames(LG)==rownames(LGSampleInfo))
+GR=read.csv("rawData/GenomeRes/GR.readcounts.cen.f1sp.csv",header=T,row.names=1)
+GRSampleInfo=read.csv("rawData/GenomeRes/GR.SAMPLE.infor.cen.f1sp.csv",header=T,row.names=1)
+all(colnames(GR)==rownames(GRSampleInfo))
+OverlapGene=Reduce(intersect, list(rownames(LS),rownames(LG),rownames(GR)))
+LS=LS[OverlapGene,]
+LG=LG[OverlapGene,]
+GR=GR[OverlapGene,]
+all(rownames(LS)==rownames(LG))
+all(rownames(LS)==rownames(GR))
+allCount=cbind(GR,LS,LG)
+GRSampleInfo$lib_type=GRSampleInfo$type
+GRSampleInfo$type=NULL
+LGSampleInfo$batch="LG"
+LSSampleInfo$batch="LS"
+GRSampleInfo$group=ifelse(GRSampleInfo$group=="CEN","LLI","F1SP")
+LGSampleInfo$sex="F"
+LSSampleInfo$sex="F"
+phenotye=c("group","lib_type","batch","sex")
+allSampleInfo=rbind(GRSampleInfo[,phenotye],LSSampleInfo[,phenotye],LGSampleInfo[,phenotye])
+all(colnames(allCount)==rownames(allSampleInfo))
+dds <- DESeqDataSetFromMatrix(countData = allCount,
+                              colData = allSampleInfo,
+                              design= ~ sex+batch+group)
+
+dds <- DESeq(dds)
+res <- results(dds, contrast=c("group","LLI","F1SP"))
+resOrdered <- res[order(res$pvalue),]
+write.table(resOrdered,file="DEG8DeseqInAllSample.txt",quote=F,sep="\t")
