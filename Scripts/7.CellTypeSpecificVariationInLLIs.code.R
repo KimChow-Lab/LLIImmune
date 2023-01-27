@@ -135,5 +135,66 @@ dev.off()
 
 
 
+###### Validation of the M1 and M2 marker genes between LLIs and control  #####################
+cluster=c("CD14 Mono","CD16 Mono")
+Mono=subset(CENSingleCell,cellType%in% cluster)
+DefaultAssay(Mono)="RNA"
+Mono.list <- SplitObject(Mono, split.by = "SampleID")
+Mono.list <- lapply(X = Mono.list, FUN = function(x) {
+    x <- NormalizeData(x, verbose = FALSE)
+    x <- FindVariableFeatures(x, verbose = FALSE)
+})
+features <- SelectIntegrationFeatures(object.list = Mono.list)
+anchors <- FindIntegrationAnchors(object.list = Mono.list, reduction = "rpca",dims = 1:50,k.filter = 100)
+Mono.integrated <- IntegrateData(anchorset = anchors, dims = 1:50)
+Mono.integrated <- ScaleData(Mono.integrated, verbose = FALSE)
+Mono.integrated <- RunPCA(Mono.integrated, verbose = FALSE)
+Mono.integrated<- RunTSNE(Mono.integrated, reduction = "pca", dims = 1:30)
+Mono.integrated<- FindNeighbors(Mono.integrated, reduction = "pca", dims = 1:30)
+Mono.integrated<- FindClusters(Mono.integrated, resolution = 1)
+
+tiff("Mac/MonoCellCluster.tiff",height=800,width=850)
+TSNEPlot(Mono.integrated)&NoAxes()&theme(panel.border = element_rect(fill=NA,color="black", size=1.5, linetype="solid"))
+dev.off()
+
+pdf("Mac/CD14_CD16Mono.pdf",width=3,height=5)
+FeaturePlot(Mono.integrated, features = c("FCGR3A","LYZ"), raster=TRUE, min.cutoff = "q9",ncol=1)&NoLegend()&NoAxes()&theme(panel.border = element_rect(fill=NA,color="black", size=1.5, linetype="solid"))
+dev.off()
+TargetGenes=c("ITGAM","CD80","CD86","FCGR1A","FCGR2A","MSR1","MRC1","CD163","CD68","EGR2")
+pdf("Mac/M1M2Marker.pdf",width=12,height=5)
+FeaturePlot(Mono.integrated, features = TargetGenes, raster=TRUE, min.cutoff = "q9",ncol=5)&NoLegend()&NoAxes()&theme(panel.border = element_rect(fill=NA,color="black", size=1.5, linetype="solid"))
+dev.off()
+
+DefaultAssay(CENSingleCell)="RNA"
+order=c("CD14 Mono","CD16 Mono","DC","MKI67","NK","CD4 T CTLs","Naive CD4 T","CD8 T","B","Megakaryocyte","Red blood cell")
+CENSingleCell$TmpGroup=paste0(CENSingleCell$cellType,"_",CENSingleCell$Group,sep="")
+
+t=DotPlot(CENSingleCell, features=c("MSR1"),group.by="TmpGroup")
+data=t$data
+TmpInfo=as.matrix(do.call(rbind, strsplit(as.character(data$id),'_')))
+data$CellType=TmpInfo[,1]
+data$Group=TmpInfo[,2]
+g=ggplot(data, aes(factor(CellType,levels=order),Group,  size= pct.exp,color=avg.exp.scaled)) +geom_point()+
+#scale_color_gradient2(low="blue",mid="white",high = "red")+
+scale_colour_viridis_c()+
+labs(color="avg.exp.scaled",size="pct.exp",x="",y="",title="")+
+theme_bw()+theme(title = element_text(size=rel(1.0)),axis.text.x = element_text(size=rel(1.0),angle=90,vjust=0.5,hjust=1),axis.text.y = element_text(size=rel(1.0))) 
+pdf("Mac/MSR1.pdf",height=3,width=6)
+print(g)
+dev.off()
+
+t=DotPlot(CENSingleCell, features=c("CD86"),group.by="TmpGroup")
+data=t$data
+TmpInfo=as.matrix(do.call(rbind, strsplit(as.character(data$id),'_')))
+data$CellType=TmpInfo[,1]
+data$Group=TmpInfo[,2]
+g=ggplot(data, aes(factor(CellType,levels=order),Group,  size= pct.exp,color=avg.exp.scaled)) +geom_point()+
+#scale_color_gradient2(low="blue",mid="white",high = "red")+
+scale_colour_viridis_c()+
+labs(color="avg.exp.scaled",size="pct.exp",x="",y="",title="")+
+theme_bw()+theme(title = element_text(size=rel(1.0)),axis.text.x = element_text(size=rel(1.0),angle=90,vjust=0.5,hjust=1),axis.text.y = element_text(size=rel(1.0))) 
+pdf("Mac/CD86.pdf",height=3,width=6)
+print(g)
+dev.off()
 
 
